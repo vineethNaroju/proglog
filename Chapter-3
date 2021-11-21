@@ -20,3 +20,18 @@ Log - the abstraction that ties all the segments together.
 
 To allow fmt.Print output to console use -v
 $ go test ./... -v
+
+---------"When we start our service, the service needs to know the offset to set on the
+next record appended to the log. The service learns the next record’s offset
+by looking at the last entry of the index, a simple process of reading the last
+12 bytes of the file. However, we mess up this process when we grow the files
+so we can memory-map them. (The reason we resize them now is that, once
+they’re memory-mapped, we can’t resize them, so it’s now or never.) We grow
+the files by appending empty space at the end of them, so the last entry is no
+longer at the end of the file—instead, there’s some unknown amount of space
+between this entry and the file’s end. This space prevents the service from
+restarting properly. That’s why we shut down the service by truncating the
+index files to remove the empty space and put the last entry at the end of the
+file once again. This graceful shutdown returns the service to a state where
+it can restart properly and efficiently"------------
+
