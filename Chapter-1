@@ -14,3 +14,5 @@ curl --location --request GET 'http://localhost:8080' \
 --data-raw '{
     "offset": 2
 }'
+
+export GOPROXY=https://goproxy.io,direct

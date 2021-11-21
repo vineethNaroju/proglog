@@ -4,15 +4,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 )
 
 func main() {
 
-	wd := "C:\\rough"
-
-	fmt.Println(wd)
-
-	file, err := ioutil.TempFile(wd, "pew")
+	file, err := ioutil.TempFile(os.TempDir(), "pew")
 	if err != nil {
 		log.Fatal(err)
 	}

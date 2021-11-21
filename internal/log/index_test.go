@@ -1,7 +1,6 @@
 package log
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -11,7 +10,7 @@ import (
 )
 
 func TestIndex(t *testing.T) {
-	temp, err := ioutil.TempFile("C:\\rough", "index_test")
+	temp, err := ioutil.TempFile(os.TempDir(), "index_test")
 	require.NoError(t, err)
 
 	defer os.Remove(temp.Name())
@@ -29,7 +28,7 @@ func TestIndex(t *testing.T) {
 	entries := []struct {
 		Off uint32
 		Pos uint64
-	} {
+	}{
 		{Off: 0, Pos: 0},
 		{Off: 1, Pos: 10},
 	}
@@ -38,14 +37,10 @@ func TestIndex(t *testing.T) {
 		err = idx.Write(want.Off, want.Pos)
 		require.NoError(t, err)
 
-		x, _ := os.Stat(temp.Name())
-		fmt.Println("after write:", x.Size())
-
 		_, pos, err := idx.Read(int64(want.Off))
 		require.NoError(t, err)
 		require.Equal(t, want.Pos, pos)
 	}
-
 
 	// fail to read beyond index size
 	_, _, err = idx.Read(int64(len(entries)))
@@ -54,19 +49,14 @@ func TestIndex(t *testing.T) {
 	// FAILS HERE TODO
 	err = idx.Close()
 	require.NoError(t, err)
-	
 
-	fmt.Println("Reopen file")
-	// build from existing file 
+	// build from existing file
 	temp, _ = os.OpenFile(temp.Name(), os.O_RDWR, 0600)
 	idx, err = newIndex(temp, c)
 	require.NoError(t, err)
 
 	off, pos, err := idx.Read(-1)
 	require.NoError(t, err)
-
-	fmt.Println(off, pos, err)
-
 	require.Equal(t, uint32(1), off)
 	require.Equal(t, entries[1].Pos, pos)
 }
