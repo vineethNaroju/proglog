@@ -1,0 +1,16 @@
+A simple JSON / HTTP commit log service, that stores records to an in-memory log.
+Go's encoding/json package encodes []bytes as base64-encoding string.
+
+curl --location --request POST 'http://localhost:8080' \
+--header 'Content-Type: text/plain' \
+--data-raw '{
+    "record": {
+        "value": "TGV0J3MgR28gIzEK"
+    }
+}'
+
+curl --location --request GET 'http://localhost:8080' \
+--header 'Content-Type: text/plain' \
+--data-raw '{
+    "offset": 2
+}'
