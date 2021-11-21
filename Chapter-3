@@ -1,0 +1,22 @@
+@ Write a Log Package
+
+Write ahead log(WAL), transaction logs, commit logs - heart of storage engines, message queues,
+version control, replication and consensus algorithms
+
+Database devs use WAL for replication. Instead of writing logs to disk, they write over network
+to its replicas and they eventually end up with same state. 
+
+We write to active segment and archive old segments.
+Each segment has a store and an index file. Store file has record data (we append records here)
+Index file indexes each record in store file. Index files are small enough to store as memory-mapped files.
+
+@ Build a Log
+
+Record - the data stored in our log.
+Store - the file we store records in.
+Index - the file we store index entries in.
+Segment - the abstraction that ties a store and an index together.
+Log - the abstraction that ties all the segments together.
+
+To allow fmt.Print output to console use -v
+$ go test ./... -v
