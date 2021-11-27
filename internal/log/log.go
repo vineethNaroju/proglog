@@ -2,6 +2,7 @@ package log
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -35,7 +36,7 @@ func NewLog(dir string, c Config) (*Log, error) {
 		Config: c,
 	}
 
-	return l, nil
+	return l, l.setup()
 }
 
 func (l *Log) newSegment(off uint64) error {
@@ -60,6 +61,7 @@ func (l *Log) setup() error {
 
 	var baseOffsets []uint64
 
+	// fetch segments from disk, parse and sort the base offsets
 	for _, file := range files {
 		offStr := strings.TrimSuffix(file.Name(), path.Ext(file.Name()))
 		off, _ := strconv.ParseUint(offStr, 10, 0)
@@ -109,7 +111,7 @@ func (l *Log) Read(off uint64) (*api.Record, error) {
 	var s *segment
 
 	for _, seg := range l.segments {
-		if s.baseOffset <= off && off < s.nextOffset {
+		if seg.baseOffset <= off && off < seg.nextOffset {
 			s = seg
 			break
 		}
@@ -122,6 +124,7 @@ func (l *Log) Read(off uint64) (*api.Record, error) {
 	return s.Read(off)
 }
 
+//Closes all segments
 func (l *Log) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -135,6 +138,7 @@ func (l *Log) Close() error {
 	return nil
 }
 
+// Closes Log and removes its data
 func (l *Log) Remove() error {
 	if err := l.Close(); err != nil {
 		return err
@@ -143,6 +147,7 @@ func (l *Log) Remove() error {
 	return os.RemoveAll(l.Dir)
 }
 
+// Removes Log and replaces with new log
 func (l *Log) Reset() error {
 	if err := l.Close(); err != nil {
 		return err
@@ -151,6 +156,7 @@ func (l *Log) Reset() error {
 	return l.setup()
 }
 
+//Helpful in replicated, co-ordinated cluster
 func (l *Log) LowestOffset() (uint64, error) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
@@ -169,4 +175,51 @@ func (l *Log) HighestOffset() (uint64, error) {
 	}
 
 	return off - 1, nil
+}
+
+//Periodically call truncate to remove old segments
+func (l *Log) Truncate(lowest uint64) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	var ts []*segment
+
+	for _, s := range l.segments {
+		if s.nextOffset <= lowest+1 {
+			if err := s.Remove(); err != nil {
+				return err
+			}
+			continue
+		}
+
+		ts = append(ts, s)
+	}
+
+	l.segments = ts
+	return nil
+}
+
+type originReader struct {
+	*store
+	off int64
+}
+
+func (o *originReader) Read(p []byte) (int, error) {
+	n, err := o.ReadAt(p, o.off)
+	o.off += int64(n)
+	return n, err
+}
+
+// Reads whole log. Helps to in coordinated consensus, snapshots and restoring logs.
+func (l *Log) Reader() io.Reader {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	readers := make([]io.Reader, len(l.segments))
+
+	for idx, seg := range l.segments {
+		readers[idx] = &originReader{seg.store, 0}
+	}
+
+	return io.MultiReader(readers...)
 }
